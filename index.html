@@ -142,6 +142,15 @@ function brandSel(){
  $("#fb").innerHTML=`<option value="">전체 브랜드 (${data.length.toLocaleString()})</option>`+ks.map(k=>`<option value="${k}"${S.b===k?" selected":""}>${esc(lbl(k))} (${m[k].n.toLocaleString()})</option>`).join("");
 }
 const COLS=[["oere","OE/RE"],["part","파트번호"],["mat","Mat."],["brand","브랜드"],["name","부품명"],["spec","사이즈"],["type","RFT/STD"],["ws","W/S"],["price","부가세 포함 (VAT포함)","r"]];
+const detRow=(x,n)=>`<tr class="det"><td colspan="${n}"><dl class="dl">${[["원래 장착되어 있던 타이어",x.orig],["Model Series",x.series],["OE Marking",x.oe]].map(([a,b])=>`<div><dt>${a}</dt><dd>${esc(b)||"-"}</dd></div>`).join("")}</dl></td></tr>`;
+function toggleRow(tr){
+ const p=tr.dataset.p,was=S.open===p;
+ document.querySelectorAll("tr.det").forEach(d=>d.remove());
+ document.querySelectorAll('tr.row[aria-expanded="true"]').forEach(r=>r.setAttribute("aria-expanded","false"));
+ S.open=null;if(was)return;
+ const x=data.find(r=>r.part===p);if(!x)return;
+ S.open=p;tr.setAttribute("aria-expanded","true");tr.insertAdjacentHTML("afterend",detRow(x,tr.children.length));
+}
 function render(){
  const q=hasQty();const cols=q?[...COLS,["qty","재고","r"]]:COLS;
  $("#src").textContent=loading?"데이터를 불러오는 중입니다…":(store==="shared"&&!data.length)?(canUp?"등록된 데이터가 없습니다. 엑셀을 업로드해 주세요.":"등록된 데이터가 없습니다. 담당자가 업로드하면 표시됩니다."):`${meta.name}${meta.at?" · "+meta.at+" 업로드":""} · 전체 ${data.length.toLocaleString()}건${store==="shared"&&!canUp?" · 읽기 전용":""}`;
@@ -151,7 +160,7 @@ function render(){
  const r=list();$("#cnt").textContent=`검색 결과 ${r.length.toLocaleString()}건`;
  $("#none").hidden=r.length>0||loading;$("#none").textContent=(store==="shared"&&!data.length)?"아직 등록된 타이어 데이터가 없습니다.":"조건에 맞는 타이어가 없습니다. 검색어를 줄이거나 필터를 해제해 보세요.";
  const cell=(x,k)=>k==="spec"?`<td class="dim">${esc(x.dim)}</td>`:k==="type"?`<td>${x.type?`<span class="tag ${x.type==="RFT"?"rft":""}">${esc(x.type)}</span>`:""}</td>`:k==="price"?`<td class="r">${won(x.price)}</td>`:k==="qty"?`<td class="r">${x.qty===""||x.qty==null?"-":esc(x.qty)}</td>`:`<td class="${["name","orig","series"].includes(k)?"w":""}">${esc(x[k])}</td>`;
- $("#tb").innerHTML=r.slice(0,S.limit).map(x=>{const o=S.open===x.part;return `<tr class="row" data-p="${esc(x.part)}" aria-expanded="${o}">${cols.map(([k])=>cell(x,k)).join("")}</tr>`+(o?`<tr class="det"><td colspan="${cols.length}"><dl class="dl">${[["원래 장착되어 있던 타이어",x.orig],["Model Series",x.series],["OE Marking",x.oe]].map(([a,b])=>`<div><dt>${a}</dt><dd>${esc(b)||"-"}</dd></div>`).join("")}</dl></td></tr>`:"")}).join("");
+ $("#tb").innerHTML=r.slice(0,S.limit).map(x=>{const o=S.open===x.part;return `<tr class="row" data-p="${esc(x.part)}" aria-expanded="${o}">${cols.map(([k])=>cell(x,k)).join("")}</tr>`+(o?detRow(x,cols.length):"")}).join("");
  $("#more").hidden=r.length<=S.limit;$("#more").textContent=`더 보기 (${Math.min(50,r.length-S.limit)}건 추가)`;
 }
 $("#q").addEventListener("input",e=>{S.q=e.target.value;S.limit=50;render()});
@@ -161,7 +170,7 @@ document.addEventListener("click",e=>{
  const th=e.target.closest("th[data-k]");
  if(th){const k=th.dataset.k;S.dir=S.k===k?-S.dir:1;S.k=k;render();return}
  const tr=e.target.closest("tr.row");
- if(tr){S.open=S.open===tr.dataset.p?null:tr.dataset.p;render()}
+ if(tr&&!String(getSelection()).trim())toggleRow(tr);
 });
 $("#more").onclick=()=>{S.limit+=50;render()};
 $("#fb").onchange=e=>{S.b=e.target.value;S.limit=50;S.open=null;render()};
