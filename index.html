@@ -26,7 +26,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible,th[data-k]:focus-vi
 .search input::placeholder{color:var(--mute);font-weight:400;font-size:18px}
 .search:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 25%,transparent)}
 .clr{border:0;background:none;color:var(--mute);padding:4px 8px}
-.filters{display:grid;gap:8px;margin:14px 0}
+.filters{display:flex;flex-wrap:wrap;gap:8px 20px;margin:14px 0}
 .frow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .frow b{font-weight:500;color:var(--mute);width:60px;font-size:13px}
 select{font:inherit;color:var(--ink);background:var(--sf);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:240px;max-width:100%}
@@ -85,6 +85,7 @@ dialog h2{margin:0 0 4px;font-size:18px}
 <label class="search"><input id="q" type="search" autocomplete="off" placeholder="규격(225/45R17), 브랜드, 제품명, 파트번호" aria-label="타이어 검색"><button class="clr" id="clr" hidden type="button" aria-label="검색어 지우기">지우기</button></label>
 <div class="filters">
 <label class="frow"><b>브랜드</b><select id="fb" aria-label="브랜드 필터"></select></label>
+<label class="frow"><b>RFT/STD</b><select id="ft" aria-label="RFT/STD 필터"></select></label>
 </div>
 <div class="bar"><span id="cnt"></span><span>부품을 누르면 원래 장착 타이어, Model Series, OE Marking이 열립니다</span></div>
 <div class="tw"><table><thead><tr id="hd"></tr></thead><tbody id="tb"></tbody></table><div id="none" class="empty" hidden>조건에 맞는 타이어가 없습니다. 검색어를 줄이거나 필터를 해제해 보세요.</div></div>
@@ -127,13 +128,18 @@ const prep=r=>{r.spec=specOf(r.dim);r.bk=norm(r.brand);r.h=norm([r.brand,r.name,
 const SAMPLE="타이어 부품번호 조회.xlsx (2026. 10. 21. 업로드 기준)";
 let data=[],meta={name:"",at:""},custom=false,store="local",loading=false,canUp=true,DB=null,cur=null;
 function useLocal(){data=DEFAULT;meta={name:SAMPLE,at:""};custom=false;try{const o=JSON.parse(localStorage.getItem(KEY)||"null");if(o&&Array.isArray(o.rows)&&o.rows.length){data=o.rows;meta=o.meta;custom=true}}catch(e){}data.forEach(prep)}
-const S={q:"",b:"",k:"spec",dir:1,limit:50,open:null};
+const S={q:"",b:"",t:"",k:"spec",dir:1,limit:50,open:null};
 const hasQty=()=>data.some(r=>r.qty!==""&&r.qty!=null);
 function list(){
  const t=S.q.split(/\s+/).map(norm).filter(Boolean);
- const r=data.filter(x=>(!S.b||x.bk===S.b)&&t.every(w=>x.h.includes(w)));
+ const r=data.filter(x=>(!S.b||x.bk===S.b)&&(!S.t||x.type===S.t)&&t.every(w=>x.h.includes(w)));
  const k=S.k,d=S.dir;
  return r.sort((a,b)=>{const A=a[k],B=b[k];return(typeof A==="number"&&typeof B==="number"?A-B:String(A||"").localeCompare(String(B||""),"ko",{numeric:true}))*d});
+}
+function typeSel(){
+ const c={};data.forEach(r=>{if(r.type)c[r.type]=(c[r.type]||0)+1});
+ const ks=Object.keys(c).sort((a,b)=>c[b]-c[a]);if(S.t&&!c[S.t])S.t="";
+ $("#ft").innerHTML=`<option value="">전체 (${data.length.toLocaleString()})</option>`+ks.map(k=>`<option value="${esc(k)}"${S.t===k?" selected":""}>${esc(k)} (${c[k].toLocaleString()})</option>`).join("");
 }
 function brandSel(){
  const m={};data.forEach(r=>{if(!r.bk)return;const o=m[r.bk]||(m[r.bk]={n:0,v:{}});o.n++;o.v[r.brand]=(o.v[r.brand]||0)+1});
@@ -155,7 +161,7 @@ function render(){
  const q=hasQty();const cols=q?[...COLS,["qty","재고","r"]]:COLS;
  $("#src").textContent=loading?"데이터를 불러오는 중입니다…":(store==="shared"&&!data.length)?(canUp?"등록된 데이터가 없습니다. 엑셀을 업로드해 주세요.":"등록된 데이터가 없습니다. 담당자가 업로드하면 표시됩니다."):`${meta.name}${meta.at?" · "+meta.at+" 업로드":""} · 전체 ${data.length.toLocaleString()}건${store==="shared"&&!canUp?" · 읽기 전용":""}`;
  $("#reset").hidden=store==="shared"||!custom;$("#up").hidden=!canUp;$("#clr").hidden=!S.q;
- brandSel();
+ brandSel();typeSel();
  $("#hd").innerHTML=cols.map(([k,l,c])=>`<th tabindex="0" data-k="${k}" class="${c||""}">${l}${S.k===k?(S.dir>0?" ▲":" ▼"):""}</th>`).join("");
  const r=list();$("#cnt").textContent=`검색 결과 ${r.length.toLocaleString()}건`;
  $("#none").hidden=r.length>0||loading;$("#none").textContent=(store==="shared"&&!data.length)?"아직 등록된 타이어 데이터가 없습니다.":"조건에 맞는 타이어가 없습니다. 검색어를 줄이거나 필터를 해제해 보세요.";
@@ -174,6 +180,7 @@ document.addEventListener("click",e=>{
 });
 $("#more").onclick=()=>{S.limit+=50;render()};
 $("#fb").onchange=e=>{S.b=e.target.value;S.limit=50;S.open=null;render()};
+$("#ft").onchange=e=>{S.t=e.target.value;S.limit=50;S.open=null;render()};
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("on"),3200)}
 
 /* 업로드 */
@@ -243,11 +250,11 @@ $("#apply").onclick=()=>{
  data=rows;custom=true;meta={name:pending.name,at:new Date().toLocaleString("ko-KR",{dateStyle:"medium",timeStyle:"short"})};
  let saved=true;
  try{localStorage.setItem(KEY,JSON.stringify({rows:data.map(({h,...r})=>r),meta}))}catch(e){saved=false}
- S.b="";S.open=null;S.limit=50;
+ S.b="";S.t="";S.open=null;S.limit=50;
  $("#dlg").close();render();
  toast(saved?`${data.length.toLocaleString()}건을 반영했습니다.`:"반영했지만 이 브라우저에 저장하지 못했습니다. 새로고침하면 기본 데이터로 돌아갑니다.");
 };
-$("#reset").onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}data=DEFAULT;data.forEach(prep);custom=false;meta={name:"샘플 데이터 (이전 양식 파일, 가격은 딜러가 기준)",at:""};S.b="";render();toast("기본 데이터로 복원했습니다.")};
+$("#reset").onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}data=DEFAULT;data.forEach(prep);custom=false;meta={name:"샘플 데이터 (이전 양식 파일, 가격은 딜러가 기준)",at:""};S.b="";S.t="";render();toast("기본 데이터로 복원했습니다.")};
 /* 직원 로그인 (ID/비밀번호는 해시로만 공유 저장소에 보관) */
 let ok=false,AUTH=null,authLoaded=false,gmode="login",autoAsked=false;
 const sha=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))].map(x=>x.toString(16).padStart(2,"0")).join("");
