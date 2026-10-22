@@ -132,12 +132,13 @@ const S={q:"",b:"",t:"",k:"spec",dir:1,limit:50,open:null};
 const hasQty=()=>data.some(r=>r.qty!==""&&r.qty!=null);
 function list(){
  const t=S.q.split(/\s+/).map(norm).filter(Boolean);
- const r=data.filter(x=>(!S.b||x.bk===S.b)&&(!S.t||x.type===S.t)&&t.every(w=>x.h.includes(w)));
+ const r=data.filter(x=>(!S.b||x.bk===S.b)&&(!S.t||grp(x.type)===S.t)&&t.every(w=>x.h.includes(w)));
  const k=S.k,d=S.dir;
  return r.sort((a,b)=>{const A=a[k],B=b[k];return(typeof A==="number"&&typeof B==="number"?A-B:String(A||"").localeCompare(String(B||""),"ko",{numeric:true}))*d});
 }
+const grp=t=>t==="RFT"||t==="RSC"?"RFT/RSC":t;
 function typeSel(){
- const c={};data.forEach(r=>{if(r.type)c[r.type]=(c[r.type]||0)+1});
+ const c={};data.forEach(r=>{if(r.type)c[grp(r.type)]=(c[grp(r.type)]||0)+1});
  const ks=Object.keys(c).sort((a,b)=>c[b]-c[a]);if(S.t&&!c[S.t])S.t="";
  $("#ft").innerHTML=`<option value="">전체 (${data.length.toLocaleString()})</option>`+ks.map(k=>`<option value="${esc(k)}"${S.t===k?" selected":""}>${esc(k)} (${c[k].toLocaleString()})</option>`).join("");
 }
@@ -165,7 +166,7 @@ function render(){
  $("#hd").innerHTML=cols.map(([k,l,c])=>`<th tabindex="0" data-k="${k}" class="${c||""}">${l}${S.k===k?(S.dir>0?" ▲":" ▼"):""}</th>`).join("");
  const r=list();$("#cnt").textContent=`검색 결과 ${r.length.toLocaleString()}건`;
  $("#none").hidden=r.length>0||loading;$("#none").textContent=(store==="shared"&&!data.length)?"아직 등록된 타이어 데이터가 없습니다.":"조건에 맞는 타이어가 없습니다. 검색어를 줄이거나 필터를 해제해 보세요.";
- const cell=(x,k)=>k==="spec"?`<td class="dim">${esc(x.dim)}</td>`:k==="type"?`<td>${x.type?`<span class="tag ${x.type==="RFT"?"rft":""}">${esc(x.type)}</span>`:""}</td>`:k==="price"?`<td class="r">${won(x.price)}</td>`:k==="qty"?`<td class="r">${x.qty===""||x.qty==null?"-":esc(x.qty)}</td>`:`<td class="${["name","orig","series"].includes(k)?"w":""}">${esc(x[k])}</td>`;
+ const cell=(x,k)=>k==="spec"?`<td class="dim">${esc(x.dim)}</td>`:k==="type"?`<td>${x.type?`<span class="tag ${x.type==="RFT"||x.type==="RSC"?"rft":""}">${esc(x.type)}</span>`:""}</td>`:k==="price"?`<td class="r">${won(x.price)}</td>`:k==="qty"?`<td class="r">${x.qty===""||x.qty==null?"-":esc(x.qty)}</td>`:`<td class="${["name","orig","series"].includes(k)?"w":""}">${esc(x[k])}</td>`;
  $("#tb").innerHTML=r.slice(0,S.limit).map(x=>{const o=S.open===x.part;return `<tr class="row" data-p="${esc(x.part)}" aria-expanded="${o}">${cols.map(([k])=>cell(x,k)).join("")}</tr>`+(o?detRow(x,cols.length):"")}).join("");
  $("#more").hidden=r.length<=S.limit;$("#more").textContent=`더 보기 (${Math.min(50,r.length-S.limit)}건 추가)`;
 }
